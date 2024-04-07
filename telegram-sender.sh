@@ -3,7 +3,7 @@ source ./env_loader.sh
 
 send_tg_message() {
   TG_MESSAGE=$1
-  echo "$TG_MESSAGE"
+#  echo "$TG_MESSAGE"
 
   if [ ! -z "$CHAT_ID" ] && [ "$CHAT_ID" != "-1234567876543" ] && [ ! -z "$API_KEY" ] && [ "$API_KEY" != "12345:AAHt2xxxxxxxxxxxxxxxxxxxxxxxxT2g" ]; then
     curl --get \
