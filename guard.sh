@@ -33,18 +33,18 @@ CHECK_CONNECTION() { # every $INTERVAL_CHECK_SECONDS seconds
     if [ "$connection" = false ]; then
         let DISCONNECT_COUNTER=DISCONNECT_COUNTER+1
         echo "connection failed, attempt "$DISCONNECT_COUNTER
-		send_tg_message "$TG_PREFIX connection failed, attempt $DISCONNECT_COUNTER $TG_HANDLES"
+        send_tg_message "$TG_PREFIX connection failed, attempt $DISCONNECT_COUNTER $TG_HANDLES"
     else
-	    if [ $DISCONNECT_COUNTER -ge 1 ]; then
-		    send_tg_message "$TG_PREFIX connection succeed $TG_HANDLES"
-	    fi
+        if [ $DISCONNECT_COUNTER -ge 1 ]; then
+            send_tg_message "$TG_PREFIX connection succeed $TG_HANDLES"
+        fi
         DISCONNECT_COUNTER=0
     fi
 
     # connection loss for 30 seconds (5sec * 6)
     if [ $DISCONNECT_COUNTER -ge $CONNECTION_CHECK_ATTEMPTS ]; then
         echo "CONNECTION LOSS"
-		send_tg_message "$TG_PREFIX CONNECTION LOSS $TG_HANDLES"
+        send_tg_message "$TG_PREFIX CONNECTION LOSS $TG_HANDLES"
         bash "$CONNECTION_LOSS_SCRIPT"
         sudo systemctl restart $SOLANA_SERVICE && echo -e "\033[31m restart solana \033[0m" && send_tg_message "$TG_PREFIX restart solana $TG_HANDLES"
     fi
@@ -99,19 +99,19 @@ echo "  Start monitoring $(TZ=Europe/Moscow date +"%Y-%m-%d %H:%M:%S") MSK"
 Delinquent=false
 
 until [[ $DISCONNECT_COUNTER -ge $DELINQUENT_CHECK_ATTEMPTS ]]; do
-	JSON=$(solana validators --url $rpcURL --output json-compact 2>/dev/null | jq '.validators[] | select(.identityPubkey == "'"${PUB_KEY}"'" )')
-	LastVote=$(echo "$JSON" | jq -r '.lastVote')
-	Delinquent=$(echo "$JSON" | jq -r '.delinquent')
-	echo -ne "Looking for $PUB_KEY. LastVote=$LastVote $(TZ=Europe/Moscow date +"%H:%M:%S") MSK \r"
-    scp -P $SSH_REMOTE_PORT -i $IDENTITY_FILE_PATH $SERV:$SOLANA_LEDGER_PATH/tower-1_9-$PUB_KEY.bin $SOLANA_LEDGER_PATH
+    JSON=$(solana validators --url $rpcURL --output json-compact 2>/dev/null | jq '.validators[] | select(.identityPubkey == "'"${PUB_KEY}"'" )')
+    LastVote=$(echo "$JSON" | jq -r '.lastVote')
+    Delinquent=$(echo "$JSON" | jq -r '.delinquent')
+    echo -ne "Looking for $PUB_KEY. LastVote=$LastVote $(TZ=Europe/Moscow date +"%H:%M:%S") MSK \r"
+    scp -P $SSH_REMOTE_PORT -i $IDENTITY_FILE_PATH $SERV:$SOLANA_LEDGER_PATH/tower-1_9-$PUB_KEY.bin $SOLANA_LEDGER_PATH > /dev/null 2>&1
     if [[ $Delinquent == true ]]; then
         let DISCONNECT_COUNTER=DISCONNECT_COUNTER+1
         echo "REMOTE server is delinquent, attempt "$DISCONNECT_COUNTER
-		send_tg_message "$TG_PREFIX REMOTE server is delinquent, attempt , attempt $DISCONNECT_COUNTER $TG_HANDLES"
+        send_tg_message "$TG_PREFIX REMOTE server is delinquent, attempt , attempt $DISCONNECT_COUNTER $TG_HANDLES"
     else
-	    if [ $DISCONNECT_COUNTER -ge 1 ]; then
-		    send_tg_message "$TG_PREFIX connection succeed $TG_HANDLES"
-	    fi
+        if [ $DISCONNECT_COUNTER -ge 1 ]; then
+            send_tg_message "$TG_PREFIX connection succeed $TG_HANDLES"
+        fi
         DISCONNECT_COUNTER=0
     fi
     sleep $INTERVAL_CHECK_SECONDS
