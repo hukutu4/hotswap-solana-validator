@@ -103,7 +103,7 @@ until [[ $DISCONNECT_COUNTER -ge $DELINQUENT_CHECK_ATTEMPTS ]]; do
 	LastVote=$(echo "$JSON" | jq -r '.lastVote')
 	Delinquent=$(echo "$JSON" | jq -r '.delinquent')
 	echo -ne "Looking for $PUB_KEY. LastVote=$LastVote $(TZ=Europe/Moscow date +"%H:%M:%S") MSK \r"
-
+    scp -P $SSH_REMOTE_PORT -i $IDENTITY_FILE_PATH $SERV:$SOLANA_LEDGER_PATH/tower-1_9-$PUB_KEY.bin $SOLANA_LEDGER_PATH
     if [[ $Delinquent == true ]]; then
         let DISCONNECT_COUNTER=DISCONNECT_COUNTER+1
         echo "REMOTE server is delinquent, attempt "$DISCONNECT_COUNTER
