@@ -1,34 +1,25 @@
 #!/bin/bash
-SSH_REMOTE_PORT=22
+source ./env_loader.sh
 
-SOL_USER="solana"
-SOLANA_SERVICE="solana-mb-jito.service"
-CONNECTION_LOSS_SCRIPT="$HOME/git-solana/vote_off.sh"
-
-PUB_KEY=$(solana-keygen pubkey ~/solana/mnt/validator-keypair.json)
-SOL=$HOME/.local/share/solana/install/active_release/bin
+PUB_KEY=$(solana-keygen pubkey $VALIDATOR_IDENTITY)
 rpcURL=$(solana config get | grep "RPC URL" | awk '{print $3}')
 CUR_IP=$(wget -q -4 -O- http://icanhazip.com)
 SITES=("www.google.com" "www.bing.com")
-#SITES=("www.googererle.com" "www.bindfgdgg.com") # uncomment to check CHECK_CONNECTION()
-DISCONNECT_COUNTER=0
 TG_PREFIX="<code>guard.sh</code> - current IP=<code>$CUR_IP</code> - <code>$PUB_KEY</code>: "
-TG_HANDLES="@hukutu4"
-
-USER_HOME_DIR=$HOME
-IDENTITY_FILE_PATH="$HOME/.ssh/id_rsa"
 
 ########################################
 pushd `dirname ${0}` > /dev/null 2>&1
 source ./telegram-sender.sh > /dev/null 2>&1
 
-solana-keygen new -s --force --no-bip39-passphrase -o $HOME/solana/unstaked-identity.json
+if [ ! -f "$UNSTAKED_IDENTITY_FILE" ]; then
+  solana-keygen new -s --force --no-bip39-passphrase -o $UNSTAKED_IDENTITY_FILE
+fi
 
-
+DISCONNECT_COUNTER=0
 echo ' == SOLANA GUARD =='
-CHECK_CONNECTION() { # every 5 seconds
+CHECK_CONNECTION() { # every $INTERVAL_CHECK_SECONDS seconds
     connection=false
-    sleep 5
+    sleep $INTERVAL_CHECK_SECONDS
     for site in "${SITES[@]}"; do
         ping -c1 $site &> /dev/null # ping every site once
         if [ $? -eq 0 ]; then
@@ -51,7 +42,7 @@ CHECK_CONNECTION() { # every 5 seconds
     fi
 
     # connection loss for 30 seconds (5sec * 6)
-    if [ $DISCONNECT_COUNTER -ge 6 ]; then
+    if [ $DISCONNECT_COUNTER -ge $CONNECTION_CHECK_ATTEMPTS ]; then
         echo "CONNECTION LOSS"
 		send_tg_message "$TG_PREFIX CONNECTION LOSS $TG_HANDLES"
         bash "$CONNECTION_LOSS_SCRIPT"
@@ -72,7 +63,7 @@ if [ "$CUR_IP" == "$IP" ]; then
   echo -e "\n solana voting on current PRIMARY SERVER"
   send_tg_message "$TG_PREFIX solana voting on current PRIMARY SERVER"
   # CHECK_CONNECTION_LOOP 
-  until [ $DISCONNECT_COUNTER -ge 4 ]; do
+  until [ $DISCONNECT_COUNTER -ge $CONNECTION_CHECK_ATTEMPTS ]; do
     CHECK_CONNECTION
   done
   exit
@@ -107,7 +98,7 @@ echo "  Start monitoring $(TZ=Europe/Moscow date +"%Y-%m-%d %H:%M:%S") MSK"
 # waiting remote server fail
 Delinquent=false
 
-until [[ $DISCONNECT_COUNTER -ge 6 ]]; do
+until [[ $DISCONNECT_COUNTER -ge $DELINQUENT_CHECK_ATTEMPTS ]]; do
 	JSON=$(solana validators --url $rpcURL --output json-compact 2>/dev/null | jq '.validators[] | select(.identityPubkey == "'"${PUB_KEY}"'" )')
 	LastVote=$(echo "$JSON" | jq -r '.lastVote')
 	Delinquent=$(echo "$JSON" | jq -r '.delinquent')
@@ -123,7 +114,7 @@ until [[ $DISCONNECT_COUNTER -ge 6 ]]; do
 	    fi
         DISCONNECT_COUNTER=0
     fi
-    sleep 5
+    sleep $INTERVAL_CHECK_SECONDS
 done
 
 echo -e "\033[31m  REMOTE server fail at $(TZ=Europe/Moscow date +"%Y-%m-%d %H:%M:%S") MSK \033[0m"
@@ -131,8 +122,8 @@ send_tg_message "$TG_PREFIX REMOTE server fail at $(TZ=Europe/Moscow date +"%Y-%
 
 # STOP SOLANA on REMOTE server
 echo "  change validator link on REMOTE server "  
-ssh REMOTE ln -sf ~/solana/unstaked-identity.json ~/solana/identity.json
-command_output=$(ssh REMOTE $SOL/solana-validator -l ~/solana/ledger set-identity ~/solana/unstaked-identity.json 2>&1)
+ssh REMOTE ln -sf $UNSTAKED_IDENTITY_FILE $IDENTITY_LINK_FILE
+command_output=$(ssh REMOTE $SOL/solana-validator -l $SOLANA_LEDGER_PATH set-identity $UNSTAKED_IDENTITY_FILE 2>&1)
 command_exit_status=$?
 echo "  try to set unstaked identity on REMOTE server: $command_output" 
 if [ $command_exit_status -eq 0 ]; then
@@ -142,19 +133,19 @@ else
   ssh REMOTE sudo systemctl restart $SOLANA_SERVICE
 fi
 echo "  move tower from REMOTE to LOCAL "
-scp -P $SSH_REMOTE_PORT -i $IDENTITY_FILE_PATH $SERV:$USER_HOME_DIR/solana/ledger/tower-1_9-$PUB_KEY.bin $USER_HOME_DIR/solana/ledger
+scp -P $SSH_REMOTE_PORT -i $IDENTITY_FILE_PATH $SERV:$SOLANA_LEDGER_PATH/tower-1_9-$PUB_KEY.bin $SOLANA_LEDGER_PATH
 
 # START SOLANA on LOCAL server
-if [ -f ~/solana/ledger/tower-1_9-$PUB_KEY.bin ]; then 
+if [ -f $SOLANA_LEDGER_PATH/tower-1_9-$PUB_KEY.bin ]; then 
   TOWER_STATUS=' with existing tower'
-  solana-validator -l ~/solana/ledger set-identity --require-tower ~/solana/mnt/validator-keypair.json; 
+  solana-validator -l $SOLANA_LEDGER_PATH set-identity --require-tower $VALIDATOR_IDENTITY; 
 else
   TOWER_STATUS=' without tower'
-  solana-validator -l ~/solana/ledger set-identity ~/solana/mnt/validator-keypair.json;
+  solana-validator -l $SOLANA_LEDGER_PATH set-identity $VALIDATOR_IDENTITY;
 fi
-ln -sfn ~/solana/mnt/validator-keypair.json ~/solana/identity.json
+ln -sfn $VALIDATOR_IDENTITY $IDENTITY_LINK_FILE
 
 echo -e "\033[31m vote ON\033[0m"$TOWER_STATUS
 send_tg_message "$TG_PREFIX vote ON $TOWER_STATUS $TG_HANDLES"
 
-solana-validator --ledger ~/solana/ledger monitor
+solana-validator --ledger $SOLANA_LEDGER_PATH monitor

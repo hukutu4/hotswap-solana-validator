@@ -1,12 +1,12 @@
 #!/bin/bash
 # # #   Stop Voting   # # # # # # # # # # # # # # # # # # # # #
-source $HOME/.profile
+source ./env_loader.sh
 
-solana-keygen new -s --force --no-bip39-passphrase -o $HOME/solana/unstaked-identity.json
+solana-keygen new -s --force --no-bip39-passphrase -o $UNSTAKED_IDENTITY_FILE
 
-ln -sf ~/solana/unstaked-identity.json ~/solana/identity.json
+ln -sf $UNSTAKED_IDENTITY_FILE $IDENTITY_LINK_FILE
 
-command_output=$(solana-validator -l ~/solana/ledger set-identity ~/solana/unstaked-identity.json 2>&1)
+command_output=$(solana-validator -l $SOLANA_LEDGER_PATH set-identity $UNSTAKED_IDENTITY_FILE 2>&1)
 command_exit_status=$?
 echo $command_output
 if [ $command_exit_status -eq 0 ]; then   echo -e "\033[32m set empty identity successful \033[0m"

@@ -1,13 +1,15 @@
 #!/bin/bash
 # # #   check address   # # # # # # # # # # # # # # # # # # # # #
+source ./env_loader.sh
+
 rpcURL=$(solana config get | grep "RPC URL" | awk '{print $3}')
 version=$(solana --version | awk '{print $2}')
 client=$(solana --version | awk -F'client:' '{print $2}' | tr -d ')')
-empty=$(solana address -k ~/solana/unstaked-identity.json)
-link=$(solana address -k ~/solana/identity.json)
-validator=$(timeout 3 stdbuf -oL solana-validator --ledger ~/solana/ledger monitor 2>/dev/null | grep -m1 Identity | awk -F': ' '{print $2}')
-PUB_KEY=$(solana address -k ~/solana/mnt/validator-keypair.json) # validator from keyfile 'validator-keypair.json'
-vote=$(solana address -k ~/solana/mnt/vote-account-keypair.json)
+empty=$(solana address -k $UNSTAKED_IDENTITY_FILE)
+link=$(solana address -k $IDENTITY_LINK_FILE)
+validator=$(timeout 3 stdbuf -oL solana-validator --ledger $SOLANA_LEDGER_PATH monitor 2>/dev/null | grep -m1 Identity | awk -F': ' '{print $2}')
+PUB_KEY=$(solana address -k $VALIDATOR_IDENTITY) # validator from keyfile 'validator-keypair.json'
+vote=$(solana address -k $VALIDATOR_VOTE_ACCOUNT)
 GRAY=$'\033[90m'; GREEN=$'\033[32m'; RED=$'\033[31m'
 CUR_IP=$(wget -q -4 -O- http://icanhazip.com)
 VAL_SERV=$(solana gossip | grep $PUB_KEY | awk '{print $1}')
